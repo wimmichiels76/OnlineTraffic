@@ -1,0 +1,15 @@
+# Live data en simulatie-uitvoer: groeit per dag, hoort niet in git
+data/live/
+data/*.log
+uit/
+
+# Tussenproducten (worden opnieuw gemaakt door bouw_net.py en sim_online.py)
+net/plain*
+net/*.add.xml
+net/*_voor_splitsen*
+data/*_voor_splitsen*
+
+# Sync- en Python-rommel
+*Edit conflict*
+__pycache__/
+.claude/

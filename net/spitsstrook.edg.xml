@@ -1,0 +1,8 @@
+<!-- OSM telt de spitsstrook richting Leuven niet als strook; hier toegevoegd als strook 0 (rechts). -->
+<edges>
+    <edge id="345078863" numLanes="3"/>
+    <edge id="39965901" numLanes="3"/>
+    <edge id="26435873" numLanes="3"/>
+    <edge id="474453521" numLanes="3"/>
+    <edge id="474453518" numLanes="3"/>
+</edges>

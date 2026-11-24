@@ -1,0 +1,5 @@
+# SUMO 1.24 zelf apart installeren (sumo en netconvert op het PATH, SUMO_HOME gezet); sumolib en traci komen mee
+pandas>=2.0
+numpy>=1.26
+matplotlib>=3.8
+pyproj>=3.6
