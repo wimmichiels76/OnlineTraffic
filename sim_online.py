@@ -22,6 +22,7 @@ sys.path.insert(0, HIER)
 import miv_data  # noqa: E402
 import rss_model  # noqa: E402
 import datex_model  # noqa: E402
+import replay  # noqa: E402
 
 if 'SUMO_HOME' in os.environ:
     sys.path.append(os.path.join(os.environ['SUMO_HOME'], 'tools'))
@@ -134,7 +135,10 @@ def main():
                  '--edgedata-output', f'uit/edgedata_{a.tag}.xml',
                  '--tripinfo-output', f'uit/tripinfo_{a.tag}.xml', '--device.tripinfo.probability', '1',
                  '--statistic-output', f'uit/stat_{a.tag}.xml', '--duration-log.statistics',
-                 '--lateral-resolution', '0'])
+                 '--vehroute-output', f'uit/vehroutes_{a.tag}.xml', '--vehroute-output.write-unfinished',
+                 '--lateral-resolution', '0']
+                + (['-g', 'net/gui.xml', '--start'] if a.gui else []))
+    opname = replay.Opname(traci)  # TraCI-ingrepen opnemen voor de zelfstandige replay (replay.py)
     meta = dict(t0=str(t0), van=a.van, tot=a.tot, datum=a.datum, live=a.live, klaar=False)
     json.dump(meta, open(f'uit/meta_{a.tag}.json', 'w'))
     log = open(f'uit/log_{a.tag}.csv', 'w')
@@ -240,7 +244,10 @@ def main():
             print(f'{m:%H:%M}  in netwerk {traci.vehicle.getIDCount():5d}  spits L/A '
                   f'{int(spitsstrook["Leuven"]["open"])}/{int(spitsstrook["Aarschot"]["open"])}', flush=True)
         m += pd.Timedelta(minutes=1)
+    einde = traci.simulation.getTime()
     traci.close()
+    t_dag = (t0 - t0.normalize()).total_seconds()
+    print('replay:', replay.schrijf(a.tag, opname, net, 0, einde, f'uit/vehroutes_{a.tag}.xml', t_dag), flush=True)
     log.close()
     simlus.close()
     meta['klaar'] = True
