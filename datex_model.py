@@ -9,8 +9,9 @@ De vertaling naar het model is dus een AANNAME per type (EFFECT hieronder, aanpa
   RoadOrCarriagewayOrLaneManagement -> *Closure*: rechterstrook dicht; newRoadworksLayout e.a.: vmax 70 km/u
   EnvironmentalObstruction          -> vmax 70 km/u
   Werfinrichting en obstakel krijgen bovendien een capaciteitsverlies: voertuigen in de zone volgen met
-  tau x 2 (smalle stroken, meer afstand). Bij 50 km/u geeft dat ~1 400 vtg/u per strook, de gemeten afvoer
-  stroomafwaarts van de werfzone op 24/11.
+  tau x 1,75 (smalle stroken, meer afstand). Afgesteld op de avondspits van 24/11 (25/11/2026): 1,6 geeft een
+  te korte reistijd, 1,9 en 2,0 laten de file tot aan de modelrand terugslaan. Het effect kantelt scherp
+  rond 1,8; met `sim_online.py --werf-tau` te overschrijven.
   AbnormalTraffic (file)            -> GEEN invoer: een file is een gevolg, het model moet die zelf maken.
                                        Deze meldingen dienen als controle.
 
@@ -25,8 +26,8 @@ LAMBERT = Transformer.from_crs('EPSG:31370', 'EPSG:4326', always_xy=True)
 EFFECT = {
     'Accident': dict(blokkeer=True, vmax=70, buffer=300),
     'MaintenanceWorks': dict(vmax=90, buffer=0),
-    'RoadOrCarriagewayOrLaneManagement': dict(vmax=70, buffer=0, tau=2.0),
-    'EnvironmentalObstruction': dict(vmax=70, buffer=0, tau=2.0),
+    'RoadOrCarriagewayOrLaneManagement': dict(vmax=70, buffer=0, tau=1.75),
+    'EnvironmentalObstruction': dict(vmax=70, buffer=0, tau=1.75),
 }
 MAX_AFSTAND = 60  # m tot de rijbaan; verder = andere weg (bv. E40, op- of afrit)
 ALERTC = {'positive': 'Aarschot', 'negative': 'Leuven'}  # E314 (A2), zie projecteer()

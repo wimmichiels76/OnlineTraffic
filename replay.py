@@ -1,4 +1,4 @@
-"""Zelfstandige SUMO-configuratie van een run, om in sumo-gui te bekijken (zonder TraCI of Python).
+"""Replay van een run, om in sumo-gui te bekijken.
 
 sim_online.py neemt tijdens de run elke TraCI-ingreep op (snelheden per strook, gesloten stroken, ongevallen) en
 laat SUMO de gereden voertuigen wegschrijven. Bij het afsluiten maakt schrijf() daarvan:
@@ -8,11 +8,16 @@ laat SUMO de gereden voertuigen wegschrijven. Bij het afsluiten maakt schrijf() 
                      regeling.add.xml   voertuigtypes, variabele snelheidsborden (RSS, meldingen, stroomafwaartse
                                         rand), strookafsluitingen (rerouter) en stilstaande ongevalsvoertuigen
                      gui.xml            kleur volgens snelheid
+                     werfzones.json     per minuut de edges met een grotere volgafstand (tau-factor)
 
-Wat er niet in zit: de grotere volgafstand (tau x 2) in werfzones. Die zet TraCI per voertuig en bestaat niet als
-additional. De file aan de werfzone in Herent is in de replay daarom kleiner dan in de run zelf.
+Twee manieren om te kijken:
+    python replay.py uit/replay_<tag>              sumo-gui via TraCI, MET de werfzones (zoals de run)
+    sumo-gui -c uit/replay_<tag>/e314.sumocfg      zonder Python, ZONDER de werfzones
+
+De grotere volgafstand in werfzones (tau x 2) bestaat niet als SUMO-additional: TraCI moet ze per voertuig zetten.
+Zonder de speler is de file aan de werfzone in Herent daarom kleiner dan in de run.
 """
-import os
+import argparse, json, os, sys
 import xml.etree.ElementTree as ET
 
 DICHT = 'passenger truck trailer delivery motorcycle bus coach'
@@ -47,7 +52,7 @@ class Opname:
         setattr(dom, fn, w)
 
 
-def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0):
+def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0, datum=None, corr=None):
     """offset (s): tel bij alle tijden op, zodat sumo-gui de kloktijd toont (sim-tijd 0 = t0 van de run)."""
     map_ = os.path.join('uit', f'replay_{tag}')
     os.makedirs(map_, exist_ok=True)
@@ -105,7 +110,8 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0):
             for a in ('arrival', 'routeLength'):
                 el.attrib.pop(a, None)
             el.set('depart', f"{float(el.get('depart')) + offset:.2f}")
-            el.set('type', el.get('type', 'auto').split('@')[0])  # 'auto@A80' = per voertuig aangepast (tau), niet weggeschreven
+            el.set('type', el.get('type', 'auto').split('@')[0])  # 'auto@A80' = per voertuig aangepast (tau)
+            el.set('departLane', 'best')  # zoals in de run; de weggeschreven vaste strook gaf veel vertrekvertraging
             voertuigen.append(el)
         else:
             rou.append(el)
@@ -148,4 +154,57 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0):
     </gui_only>
 </configuration>
 ''')
+    if datum is not None:
+        json.dump(werfzones(net, corr, datum, offset, begin, einde), open(os.path.join(map_, 'werfzones.json'), 'w'))
     return map_
+
+
+def werfzones(net, corr, datum, offset, begin, einde):
+    """[[kloktijd_s, {edge: tau-factor}], ...] bij elke wijziging; zelfde logica als de run (datex_model)."""
+    import pandas as pd
+    import datex_model
+    mel = datex_model.Meldingen(net, corr, None)
+    d, A = datex_model.lees(datum)
+    t0 = pd.Timestamp(datum) + pd.Timedelta(seconds=offset)
+    uit, vorige = [], None
+    for s in range(int(begin), int(einde), 60):
+        m = t0 + pd.Timedelta(seconds=s)
+        mel.gewenst(datex_model.actief(d, A, m))
+        if mel.zone_tau != vorige:
+            uit.append([s + offset, dict(mel.zone_tau)])
+            vorige = dict(mel.zone_tau)
+    return uit
+
+
+def speel(map_, gui=True):
+    """Speelt de replay af via TraCI en zet tau in de werfzones, zoals sim_online.py dat doet."""
+    hier = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, hier)
+    if 'SUMO_HOME' in os.environ:
+        sys.path.append(os.path.join(os.environ['SUMO_HOME'], 'tools'))
+    import sumolib, traci
+    import datex_model
+    zones = json.load(open(os.path.join(map_, 'werfzones.json')))
+    net = sumolib.net.readNet(os.path.join(hier, 'net', 'e314.net.xml'))
+    corr = json.load(open(os.path.join(hier, 'data', 'corridor.json')))
+    traci.start([sumolib.checkBinary('sumo-gui' if gui else 'sumo'), '-c', os.path.join(map_, 'e314.sumocfg')]
+                + ([] if gui else ['--no-step-log', '--duration-log.statistics']))
+    mel = datex_model.Meldingen(net, corr, traci)
+    k = 0
+    while traci.simulation.getMinExpectedNumber() > 0:
+        t = traci.simulation.getTime()
+        while k < len(zones) and zones[k][0] <= t:
+            mel.zone_tau = zones[k][1]
+            k += 1
+        traci.simulationStep(t + 5)
+        if mel.zone_tau or mel.aangepast:
+            mel.pas_tau_toe()
+    traci.close()
+
+
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser(description='Replay van een run afspelen in sumo-gui, met de werfzones.')
+    ap.add_argument('map', help='uit/replay_<tag>')
+    ap.add_argument('--zonder-gui', action='store_true')
+    a = ap.parse_args()
+    speel(a.map, not a.zonder_gui)

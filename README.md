@@ -15,14 +15,14 @@ Prototype, gestart op 24/11/2026. De vraag: kan een SUMO-model van een snelweg, 
 | 6. Validatie | `vergelijk.py --tag …` | `uit/vergelijking_<tag>.png/.md`: tijd-ruimtediagrammen van de snelheid (gemeten en SUMO), reistijd, debiet, trefkans files |
 | 6b. Radiotekst | `radiotekst.py --tag … [--tijd HH:MM] [--bron gemeten\|model]` | Voorleesbaar bericht: files (< 60 km/u over ≥ 1 km, tussen complexen), verliestijd t.o.v. 115 km/u, oorzaak uit DATEX, trend t.o.v. 10 min eerder. Staat ook in de viewer, met een kopieerknop. |
 | 7. Viewer | `maak_viewer.py --tag …` | `uit/viewer_<tag>.html` (bovenop `viewer_sjabloon.html`): GRB-kaart met per wegvak de gemeten snelheid (brede rand) en de SUMO-snelheid (kern), een tijdschuif met afspelen (spatie, ←/→), klikbare tijd-ruimtediagrammen, de reistijd en de spitsstrookstatus. Het bestand staat op zichzelf; Leaflet en de kaarttegels komen van internet. |
-| 8. Replay in sumo-gui | automatisch na elke `sim_online.py`-run (`replay.py`) | `uit/replay_<tag>/e314.sumocfg`: openen met `sumo-gui -c uit/replay_<tag>/e314.sumocfg`. Alle voertuigen met hun gereden route en vertrektijd, de snelheden per strook (RSS, meldingen, stroomafwaartse rand) als variabele snelheidsborden, gesloten stroken als rerouter, ongevallen als stilstaand voertuig. De klok toont de echte tijd. Niet in de replay: tau × 2 in werfzones (alleen via TraCI). Daardoor is de file aan de werfzone kleiner: avondspits 24/11 gemiddeld 39 s tijdverlies per voertuig in de replay tegenover 183 s in de run. Wie het volledige model live in de GUI wil volgen: `sim_online.py … --gui`. |
+| 8. Replay in sumo-gui | automatisch na elke `sim_online.py`-run (`replay.py`) | `uit/replay_<tag>/e314.sumocfg`: openen met `sumo-gui -c uit/replay_<tag>/e314.sumocfg`. Alle voertuigen met hun gereden route en vertrektijd, de snelheden per strook (RSS, meldingen, stroomafwaartse rand) als variabele snelheidsborden, gesloten stroken als rerouter, ongevallen als stilstaand voertuig. De klok toont de echte tijd. De grotere volgafstand in werfzones bestaat niet als SUMO-additional; die zet `python replay.py uit/replay_<tag>` via TraCI (met `werfzones.json`). Met alleen de sumocfg is de file aan de werfzone kleiner. Wie het volledige model live in de GUI wil volgen: `sim_online.py … --gui`. |
 
 ## Modelprincipe
 
 - **Invoer:** de gemeten telling op de eerste hoofdbaandoorsnede en op elke oprit (auto/vracht), per minuut.
 - **Afritkeuze:** sequentiële afsplitsing. Per afrit geldt p = afrit / balans hoofdbaan, berekend over een venster van 5 min.
 - **Spitsstrook:** strook 0 gaat open of dicht volgens de S09-lussen van die richting. Alleen op stukken zonder in- of uitvoegende tak.
-- **Rijstrooksignalisatie** (`rss_model.py`): elk portaal geldt tot het volgende portaal. SNELH_x wordt de vmax per strook (× `--rss-naleving`, standaard 1,0). Kruis en gele pijl sluiten de strook, behalve op een edge met een tak; daar wordt het 30 km/u. Uitzetten kan met `--zonder-rss`.
+- **Rijstrooksignalisatie** (`rss_model.py`): elk portaal geldt tot het volgende portaal. SNELH_x wordt de vmax per strook (× `--rss-naleving`, standaard 1,0). Kruis en gele pijl sluiten de strook, behalve op een edge met een tak; daar wordt het 30 km/u. Een pijl naar rechts met onderbord UITRIT betekent "deze strook leidt naar de afrit" en sluit niets. Uitzetten kan met `--zonder-rss`.
 - **Stroomafwaartse rand:** de gemeten snelheid op de laatste doorsnede wordt de vmax van de laatste edge. Zo kan een file die van buiten het model komt (E40, Leuven) terugslaan.
 - **Validatie:** alle tussenliggende hoofdbaanlussen (±25 per richting) worden *niet* als invoer gebruikt. Ze dienen alleen als controle.
 
@@ -30,12 +30,12 @@ Prototype, gestart op 24/11/2026. De vraag: kan een SUMO-model van een snelweg, 
 
 - Er is geen historisch archief met snelheden publiek beschikbaar. De MIV-historiek staat bij ANYWAYS op data1 (`/var/services/files/verkeerscentrum/`); de traffic-counts-api bewaart wel tellingen, maar geen snelheden.
 - De configuratie-endpoint van MIV is sinds 05/12/2025 niet meer bijgewerkt (zie de Issue Tracker), maar voor de E314 zijn alle lussen aanwezig.
-- De rijstrooksignalisatie (RSS) zit sinds 24/11 in het model. Op de E314 hangen alleen in richting Aarschot borden, tussen km 86,7 en 80,8. Op 24/11 stond daar een zone van 50 km/u met de weefstrook dicht. DATEX meldde een werfinrichting (08/11 tot 30/11) en een verzakking bij Herent.
+- De rijstrooksignalisatie (RSS) zit sinds 24/11 in het model. Op de E314 hangen alleen in richting Aarschot borden, tussen km 86,7 en 80,8. Op 24/11 stond daar een zone van 50 km/u; op de weefstroken (R09) stond een pijl naar rechts met onderbord UITRIT. DATEX meldde een werfinrichting (08/11 tot 30/11) en een verzakking bij Herent.
 - Test 24/11, 14:55-15:09, richting Aarschot: zonder RSS kwam de reistijd op 11,0 min tegen 14,7 gemeten en werd geen enkele filecel getroffen. Met RSS was het 14,0 min (gemeten 14,6) en werden alle filecellen getroffen, met 38 % vals alarm. In SUMO rijdt iedereen 50 in de zone, in werkelijkheid 75-90. De echte file staat bij km 4-5,5 (vóór Herent), op een plek die het model nog niet als knelpunt heeft. Naleving 1,3 geeft een lagere RMSE (13,7) maar een te korte reistijd (12,5 min).
 - DATEX-meldingen zitten in het model (`datex_model.py`, uitzetten met `--zonder-datex`). De feed geeft geen stroken, dus het effect per type is een aanname:
   - ongeval: een stilstaand voertuig op de rechterstrook, plus 70 km/u op ±300 m;
   - werken: 90 km/u;
-  - werfinrichting of verzakking: 70 km/u, plus tau × 2 in de zone, wat de capaciteit verlaagt;
+  - werfinrichting of verzakking: 70 km/u, plus tau × 1,75 in de zone, wat de capaciteit verlaagt (`--werf-tau`);
   - filemeldingen dienen alleen als controle.
 - Richting: Alert-C 'positive' = richting Aarschot. Dat is afgeleid op 24/11 uit filemeldingen die samenvielen met de gemeten file.
 - De hoofdbaan is in stukken van ±250 m geknipt (`bouw_net.py`), zodat RSS en meldingen lokaal ingrijpen.
@@ -52,7 +52,16 @@ Prototype, gestart op 24/11/2026. De vraag: kan een SUMO-model van een snelweg, 
   | gemiddelde vertrekvertraging | 403 s | 96 s | 101 s | |
 
 - Coöperatief strookwisselen staat in SUMO standaard al op het maximum (`lcCooperative` = 1). Meer assertief invoegen veranderde weinig.
-- Open punt: de oprit Gasthuisberg richting Aarschot wacht nog gemiddeld 40 min. Zijn strook loopt 420 m door en wordt de afrit Winksele (weefvak), midden in de file. Wie verder rijdt, moet daar in de file naar links; dat lukt SUMO slecht. Dat verklaart ook de lage GEH richting Aarschot.
+- **Weefstrook Gasthuisberg (25/11):** de oprit Gasthuisberg richting Aarschot wachtte nog gemiddeld 40 min. Oorzaak: `rss_model.py` las de pijl naar rechts met onderbord UITRIT als afsluiting, waardoor de weefstrook 79 m na de oprit dichtging. Nu blijft ze open en voegt de oprit vlot in (gemiddeld 14 s).
+- Met de volledige vraag op de hoofdbaan werd de werfzone in Herent met tau × 2 een te sterke flessenhals: de file sloeg terug tot de modelrand. Afstelling op de avondspits van 24/11, richting Aarschot:
+
+  | tau-factor werfzone | 1,3 | 1,6 | **1,75** | 1,9 | 2,0 | gemeten |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | reistijd gem/max (min) | 15,0 / 28,7 | 16,8 / 38,0 | **21,8 / 49,9** | 31,1 / 60,6 | 33,8 / 61,3 | 25,5 / 53,3 |
+  | RMSE snelheid (km/u) | 16,6 | 16,0 | **14,5** | 16,0 | 19,9 | |
+  | trefkans file (vals alarm) | 99 % (19 %) | 99 % (19 %) | **99 % (19 %)** | 100 % (24 %) | 100 % (30 %) | |
+
+  Het effect kantelt scherp rond 1,8. De standaard is nu 1,75. Richting Leuven: 98 % van de debieten binnen GEH 5. De replay van deze afstelling staat in `uit/replay_tau1.75_2026-11-24/`.
 
 ## Installatie
 

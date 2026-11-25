@@ -7,6 +7,9 @@ Per strook betekent het bevestigde beeld:
   EINDE_x, EINDE, DOVEN, GROENE_PIJL -> standaardsnelheid
   KRUIS, PIJL_LINKS, PIJL_RECHTS     -> strook dicht (alleen op edges zonder in-/uitvoegende tak;
                                         anders 30 km/u, zodat een afrit bereikbaar blijft)
+  PIJL_RECHTS met onderbord UITRIT    -> GEEN afsluiting: 'deze strook leidt naar de afrit' (weefstrook R09).
+                                        Tot 25/11/2026 werd dit als afsluiting gelezen; de weefstrook achter de oprit
+                                        Gasthuisberg ging dan na 79 m dicht en het opritverkeer raakte niet ingevoegd.
 MIV/RSS-strooknummers worden links uitgelijnd: R11 = meest linkse strook bij 2+ stroken, R10 daarnaast, R09, R08.
 """
 import json, math, os, re
@@ -77,8 +80,9 @@ def toestand(d, m):
     if sel.empty:  # vóór de start van de RSS-logger: eerste bekende beeld (werfinrichtingen blijven dagen staan)
         sel = d[d.tijd == d.tijd.min()]
     laatste = sel.sort_values('tijd').groupby('bord_id').tail(1)
-    return {r.bord_id: (r.teken if r.teken != 'DOVEN' else r.pijl) for r in laatste.itertuples()
-            if r.in_dienst == 1 and r.defect == 0}
+    return {r.bord_id: ('UITRIT' if r.onderbord == 'UITRIT' and str(r.teken).startswith('PIJL')
+                        else r.teken if r.teken != 'DOVEN' else r.pijl)
+            for r in laatste.itertuples() if r.in_dienst == 1 and r.defect == 0}
 
 
 class RSS:

@@ -106,7 +106,12 @@ def main():
     ap.add_argument('--rss-naleving', type=float, default=1.0, help='gereden snelheid = factor x bordsnelheid')
     ap.add_argument('--lc', default='', help='extra strookwisselparameters voor auto en vracht, bv. '
                     '"lcCooperative=1 lcCooperativeSpeed=1 lcAssertive=1.5"')
+    ap.add_argument('--werf-tau', type=float, help='tau-factor in werfzones (standaard: datex_model.EFFECT, 2.0)')
     a = ap.parse_args()
+    if a.werf_tau:
+        for eff in datex_model.EFFECT.values():
+            if 'tau' in eff:
+                eff['tau'] = a.werf_tau
     random.seed(a.seed)
     os.chdir(HIER)
     os.makedirs('uit', exist_ok=True)
@@ -151,6 +156,8 @@ def main():
     # let op: TraCI geeft de rekenkundige gemiddelde snelheid, de e1-xml de harmonische
     simlus = open(f'uit/sim_minuut_{a.tag}.csv', 'w')
     simlus.write('tijd,unieke_id,q,v\n')
+    simlus.flush()
+    log.flush()  # kop meteen wegschrijven: de live viewer leest deze bestanden al vóór de eerste minuut
     lussen = traci.inductionloop.getIDList()
 
     n_veh = 0
@@ -247,7 +254,8 @@ def main():
     einde = traci.simulation.getTime()
     traci.close()
     t_dag = (t0 - t0.normalize()).total_seconds()
-    print('replay:', replay.schrijf(a.tag, opname, net, 0, einde, f'uit/vehroutes_{a.tag}.xml', t_dag), flush=True)
+    print('replay:', replay.schrijf(a.tag, opname, net, 0, einde, f'uit/vehroutes_{a.tag}.xml', t_dag,
+                                       a.datum, corr), flush=True)
     log.close()
     simlus.close()
     meta['klaar'] = True
