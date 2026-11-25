@@ -57,7 +57,7 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0, datum=None, cor
     map_ = os.path.join('uit', f'replay_{tag}')
     os.makedirs(map_, exist_ok=True)
     # ---- snelheden per strook -> variabele snelheidsborden
-    snel, dicht, ongeval = {}, {}, {}
+    snel, dicht, ongeval, vracht = {}, {}, {}, set()
     for t, wat, i, v in opname.rij:
         if wat == 'lane.setMaxSpeed':
             snel.setdefault(i, []).append((t, v))
@@ -65,7 +65,10 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0, datum=None, cor
             for L in net.getEdge(i).getLanes():
                 snel.setdefault(L.getID(), []).append((t, v))
         elif wat == 'lane.setDisallowed':
-            dicht.setdefault(i, []).append((t, bool(v)))
+            if v and 'passenger' not in v:  # enkel vrachtwagens geweerd (meest linkse strook): permanent verbod
+                vracht.add(i)
+            else:
+                dicht.setdefault(i, []).append((t, bool(v)))
         elif wat == 'ongeval+':
             ongeval[i] = [t, None, v]
         elif wat == 'ongeval-' and i in ongeval:
@@ -95,6 +98,10 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0, datum=None, cor
         for b, e in intervallen:
             iv = ET.SubElement(rr, 'interval', begin=f'{b + offset:.0f}', end=f'{e + offset:.0f}')
             ET.SubElement(iv, 'closingLaneReroute', id=lid, disallow=DICHT)
+    for k, lid in enumerate(sorted(vracht)):
+        rr = ET.SubElement(add, 'rerouter', id=f'vracht{k}', edges=lid.rsplit('_', 1)[0])
+        iv = ET.SubElement(rr, 'interval', begin=f'{begin + offset:.0f}', end=f'{einde + offset:.0f}')
+        ET.SubElement(iv, 'closingLaneReroute', id=lid, disallow='truck trailer')
     ET.indent(add)
     ET.ElementTree(add).write(os.path.join(map_, 'regeling.add.xml'), encoding='utf-8', xml_declaration=True)
     # ---- voertuigen: de door SUMO weggeschreven routes, zonder ongevalsvoertuigen, + ongevallen met een stop

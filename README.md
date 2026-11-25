@@ -53,6 +53,8 @@ Prototype, gestart op 24/11/2026. De vraag: kan een SUMO-model van een snelweg, 
   | gemiddelde vertrekvertraging | 403 s | 96 s | 101 s | |
 
 - Coöperatief strookwisselen staat in SUMO standaard al op het maximum (`lcCooperative` = 1). Meer assertief invoegen veranderde weinig.
+- **Vrachtwagens rechts (25/11):** vrachtwagens mogen niet op de meest linkse strook van de hoofdbaan (wegcode bij 3+ stroken; de tellingen van 24/11 tonen het ook bij 2 stroken: 94 % rijdt rechts, bij 3 stroken rijdt 4 % links). Avondspits 24/11 richting Aarschot: reistijd 21,4 / 56,6 min (was 21,8 / 49,9), RMSE 14,1 km/u (was 14,5). `analyse/stroken.py --tag …` vergelijkt de strookverdeling.
+- **Te weinig verkeer na de werfzone:** vanaf km 80,8 meet MIV ±3 700-3 800 vtg/u, het model ±3 000. De doorsneden in de file (km 86,7 tot km 81,7) tellen samen met de op- en afritten ±750 vtg/u minder dan de doorsnede na de file. Lussen in stop-and-go tellen allicht te weinig; de instroom op km 86,7 ligt in die file. De instroom vanaf het Knooppunt Heverlee (vlot verkeer) moet dat oplossen.
 - **Weefstrook Gasthuisberg (25/11):** de oprit Gasthuisberg richting Aarschot wachtte nog gemiddeld 40 min. Oorzaak: `rss_model.py` las de pijl naar rechts met onderbord UITRIT als afsluiting, waardoor de weefstrook 79 m na de oprit dichtging. Nu blijft ze open en voegt de oprit vlot in (gemiddeld 14 s).
 - Met de volledige vraag op de hoofdbaan werd de werfzone in Herent met tau × 2 een te sterke flessenhals: de file sloeg terug tot de modelrand. Afstelling op de avondspits van 24/11, richting Aarschot:
 

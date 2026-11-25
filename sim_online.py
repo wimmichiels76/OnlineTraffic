@@ -31,6 +31,7 @@ import traci  # noqa: E402
 
 VENSTER = 5  # minuten voor afrit-aandelen en spitsstrookstatus
 DICHT = ['passenger', 'truck', 'trailer', 'delivery', 'motorcycle', 'bus', 'coach']
+VRACHT_LINKS = ['truck', 'trailer']
 
 
 def schrijf_additionals(corr, pad, tag, lc=''):
@@ -178,6 +179,13 @@ def main():
     rss = None if a.zonder_rss else rss_model.RSS(net, corr, traci, a.rss_naleving)
     mel = None if a.zonder_datex else datex_model.Meldingen(net, corr, traci)
     regelaar = datex_model.Regelaar(traci)
+    # Vrachtwagens niet op de meest linkse strook van de hoofdbaan (wegcode bij 3+ stroken; de MIV-tellingen van
+    # 24/11 tonen het ook bij 2 stroken: 94 % van de vrachtwagens rijdt rechts). Spitsstrook = strook 0 (rechts).
+    for c in corr.values():
+        for e in c['route']:
+            n = net.getEdge(e).getLaneNumber()
+            if n >= 2:
+                traci.lane.setDisallowed(f'{e}_{n - 1}', VRACHT_LINKS)
     rss_data, datex_d, datex_a = None, None, None
     # per minuut de lussen uitlezen (de e1-xml schrijft SUMO pas weg bij het afsluiten);
     # let op: TraCI geeft de rekenkundige gemiddelde snelheid, de e1-xml de harmonische

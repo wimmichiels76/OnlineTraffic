@@ -192,6 +192,7 @@ class Regelaar:
 
     def __init__(self, traci):
         self.traci, self.orig, self.toegepast = traci, {}, {}
+        self.orig_dis = {}  # oorspronkelijke verboden voertuigklassen (bv. vrachtverbod links), hersteld na heropenen
 
     @staticmethod
     def samen(*wensen):
@@ -212,8 +213,9 @@ class Regelaar:
                 continue
             if lid not in self.orig:
                 self.orig[lid] = self.traci.lane.getMaxSpeed(lid)
+                self.orig_dis[lid] = list(self.traci.lane.getDisallowed(lid))
             if oud == ('dicht',):
-                self.traci.lane.setDisallowed(lid, [])
+                self.traci.lane.setDisallowed(lid, self.orig_dis[lid])
             if nieuw is None:
                 self.traci.lane.setMaxSpeed(lid, self.orig[lid])
             elif nieuw[0] == 'v':
