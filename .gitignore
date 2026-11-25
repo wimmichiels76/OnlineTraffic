@@ -6,8 +6,8 @@ uit/
 # Tussenproducten (worden opnieuw gemaakt door bouw_net.py en sim_online.py)
 net/plain*
 net/*.add.xml
-net/*_voor_splitsen*
-data/*_voor_splitsen*
+net/*_voor_*
+data/*_voor_*
 
 # Sync- en Python-rommel
 *Edit conflict*

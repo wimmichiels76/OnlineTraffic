@@ -32,14 +32,14 @@ VENSTER = 5  # minuten voor afrit-aandelen en spitsstrookstatus
 DICHT = ['passenger', 'truck', 'trailer', 'delivery', 'motorcycle', 'bus', 'coach']
 
 
-def schrijf_additionals(corr, pad, tag):
+def schrijf_additionals(corr, pad, tag, lc=''):
     """e1-lussen op alle meetdoorsneden (enkel validatie) + voertuigtypes."""
     with open(pad, 'w', encoding='utf-8') as f:
         f.write('<additional>\n')
         f.write('  <vType id="auto" vClass="passenger" length="4.6" maxSpeed="42" speedDev="0.1" tau="1.0" '
-                'lcSpeedGain="1.0" lcKeepRight="1.0"/>\n')
+                f'lcSpeedGain="1.0" lcKeepRight="1.0" {lc}/>\n')
         f.write('  <vType id="vracht" vClass="truck" length="15" maxSpeed="25" speedDev="0.05" accel="0.6" decel="3.5" '
-                'tau="1.2"/>\n')
+                f'tau="1.2" {lc}/>\n')
         f.write('  <vType id="ongeval" vClass="authority" length="10" maxSpeed="1" color="1,0,1"/>\n')
         for naam, c in corr.items():
             for d in c['doorsneden']:
@@ -103,6 +103,8 @@ def main():
     ap.add_argument('--zonder-rss', action='store_true', help='rijstrooksignalisatie niet toepassen')
     ap.add_argument('--zonder-datex', action='store_true', help='DATEX-meldingen (ongeval, werken) niet toepassen')
     ap.add_argument('--rss-naleving', type=float, default=1.0, help='gereden snelheid = factor x bordsnelheid')
+    ap.add_argument('--lc', default='', help='extra strookwisselparameters voor auto en vracht, bv. '
+                    '"lcCooperative=1 lcCooperativeSpeed=1 lcAssertive=1.5"')
     a = ap.parse_args()
     random.seed(a.seed)
     os.chdir(HIER)
@@ -112,7 +114,8 @@ def main():
     net = sumolib.net.readNet('net/e314.net.xml')
     R = routes_bouwen(net, corr)
     add = f'net/e314_{a.tag}.add.xml'
-    schrijf_additionals(corr, add, a.tag)
+    lc = ' '.join(f'{k}="{v}"' for k, v in (p.split('=') for p in a.lc.split())) if a.lc else ''
+    schrijf_additionals(corr, add, a.tag, lc)
 
     t0 = pd.Timestamp(f'{a.datum} {a.van}') - pd.Timedelta(minutes=a.opwarm)
     t1 = pd.Timestamp(f'{a.datum} {a.tot}')

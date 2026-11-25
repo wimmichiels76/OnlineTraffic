@@ -39,7 +39,19 @@ Prototype, gestart op 24/11/2026. De vraag: kan een SUMO-model van een snelweg, 
 - Richting: Alert-C 'positive' = richting Aarschot. Dat is afgeleid op 24/11 uit filemeldingen die samenvielen met de gemeten file.
 - De hoofdbaan is in stukken van ±250 m geknipt (`bouw_net.py`), zodat RSS en meldingen lokaal ingrijpen.
 - Test 24/11, 14:55-15:22, richting Aarschot: met RSS alleen was de reistijd gemiddeld 14,9 min (gemeten 17,1). Met RSS en meldingen 17,3 min; het maximum was 19,7 min tegen 23,9 gemeten. De filekop ligt juist, bij de werfzone in Herent.
-- SUMO is nog niet gekalibreerd: standaard Krauss, tau 1,0 s voor auto's en 1,2 s voor vrachtwagens.
+- SUMO is nog niet gekalibreerd: standaard Krauss, tau 1,0 s voor auto's en 1,2 s voor vrachtwagens. Extra strookwisselparameters kunnen mee met `--lc "lcAssertive=1.5 …"`.
+- **Invoegstroken (25/11):** het knippen in `bouw_net.py` liet netconvert de verbindingen vóór de opritten opnieuw gokken. Bij zes opritten liep strook 0 van de hoofdbaan dan rechtdoor op de invoegstrook, zodat opritverkeer voorrang moest geven en tot uren wachtte (de live-run van 24/11 verloor zo een groot deel van de vraag). De verbindingen van OSM blijven nu behouden; de twee opritten in de spitsstrookzone richting Leuven kregen een vierde strook als invoegstrook. `opritten.py <tag> …` toont de vertrekvertraging per ingang.
+- Avondspits 24/11, 15:00-20:15, met RSS en DATEX, herspeeld op het hersteld netwerk:
+
+  | | live-run (oud netwerk) | hersteld netwerk | + `lcAssertive=1.5` | gemeten |
+  | --- | --- | --- | --- | --- |
+  | reistijd richting Aarschot gem/max (min) | 15,6 / 29,4 | 25,8 / 47,6 | 26,5 / 51,5 | 25,5 / 53,3 |
+  | trefkans file richting Aarschot | 99 % | 99 % (20 % vals alarm) | 99 % (21 %) | |
+  | debiet GEH < 5, richting Leuven / Aarschot | 27 % / 10 % | 97 % / 22 % | 98 % / 22 % | |
+  | gemiddelde vertrekvertraging | 403 s | 96 s | 101 s | |
+
+- Coöperatief strookwisselen staat in SUMO standaard al op het maximum (`lcCooperative` = 1). Meer assertief invoegen veranderde weinig.
+- Open punt: de oprit Gasthuisberg richting Aarschot wacht nog gemiddeld 40 min. Zijn strook loopt 420 m door en wordt de afrit Winksele (weefvak), midden in de file. Wie verder rijdt, moet daar in de file naar links; dat lukt SUMO slecht. Dat verklaart ook de lage GEH richting Aarschot.
 
 ## Installatie
 
