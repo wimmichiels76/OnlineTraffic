@@ -37,3 +37,19 @@ hev.sort(key=lambda d: (d['ident8'], d['kmp'] or 0, d['strook']))
 with open('data/meetpunten_heverlee.csv', 'w', newline='', encoding='utf-8') as fh:
     w = csv.DictWriter(fh, fieldnames=list(hev[0])); w.writeheader(); w.writerows(hev)
 print(len(hev), 'meetpunten Knooppunt Heverlee')
+
+# ---- E314 vóór Aarschot (Tielt-Winge, Bekkevoort, Halen): de ochtendfile richting Leuven begint soms al vóór
+# Aarschot, buiten het model. Ook apart, zodat netwerk en koppeling ongewijzigd blijven.
+noord = []
+for m in r.findall('meetpunt'):
+    g = lambda t: (m.findtext(t) or '').strip()
+    lon, lat = f(g('lengtegraad_EPSG_4326')), f(g('breedtegraad_EPSG_4326'))
+    if (lon is None or lat is None or m.get('unieke_id') in e314 or not g('Ident_8').startswith('A002')
+            or not (4.80 < lon < 5.10 and lat > 50.94)):
+        continue
+    noord.append(dict(unieke_id=m.get('unieke_id'), beschrijvende_id=g('beschrijvende_id'), naam=g('volledige_naam'),
+                      ident8=g('Ident_8'), kmp=f(g('Kmp_Rsys')), strook=g('Rijstrook'), lon=lon, lat=lat))
+noord.sort(key=lambda d: (d['ident8'], d['kmp'] or 0, d['strook']))
+with open('data/meetpunten_noord.csv', 'w', newline='', encoding='utf-8') as fh:
+    w = csv.DictWriter(fh, fieldnames=list(noord[0])); w.writeheader(); w.writerows(noord)
+print(len(noord), 'meetpunten E314 voor Aarschot')

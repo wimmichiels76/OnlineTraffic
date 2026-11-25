@@ -41,7 +41,7 @@ def schrijf_additionals(corr, pad, tag, lc=''):
         f.write('  <vType id="auto" vClass="passenger" length="4.6" maxSpeed="42" speedDev="0.1" tau="1.0" '
                 f'lcSpeedGain="1.0" lcKeepRight="1.0" {lc}/>\n')
         f.write('  <vType id="vracht" vClass="truck" length="15" maxSpeed="25" speedDev="0.05" accel="0.6" decel="3.5" '
-                f'tau="1.2" {lc}/>\n')
+                f'tau="1.2" lcKeepRight="10" {lc}/>\n')
         f.write('  <vType id="ongeval" vClass="authority" length="10" maxSpeed="1" color="1,0,1"/>\n')
         for naam, c in corr.items():
             for d in c['doorsneden']:
@@ -179,12 +179,15 @@ def main():
     rss = None if a.zonder_rss else rss_model.RSS(net, corr, traci, a.rss_naleving)
     mel = None if a.zonder_datex else datex_model.Meldingen(net, corr, traci)
     regelaar = datex_model.Regelaar(traci)
-    # Vrachtwagens niet op de meest linkse strook van de hoofdbaan (wegcode bij 3+ stroken; de MIV-tellingen van
-    # 24/11 tonen het ook bij 2 stroken: 94 % van de vrachtwagens rijdt rechts). Spitsstrook = strook 0 (rechts).
+    # Vrachtwagens niet op de meest linkse strook bij 3+ stroken (wegcode). Bij 2 stroken geen verbod: gaat de
+    # rechterstrook dicht (werfzone), dan moeten ze links kunnen. Daar zorgt lcKeepRight="10" in het vType ervoor dat
+    # ze rechts blijven (MIV 24/11: 94 % rijdt rechts bij 2 stroken). Spitsstrook = strook 0 (rechts).
+    # Niet vóór een strookvermindering: daar loopt de rechterstrook dood en kan een afsluiting (werfzone) de enige
+    # resterende weg voor vrachtwagens blokkeren (25/11, Herent: 3 -> 2 stroken met de rechterstrook dicht).
     for c in corr.values():
-        for e in c['route']:
+        for e, volgende in zip(c['route'], c['route'][1:] + [None]):
             n = net.getEdge(e).getLaneNumber()
-            if n >= 2:
+            if n >= 3 and (volgende is None or net.getEdge(volgende).getLaneNumber() >= n):
                 traci.lane.setDisallowed(f'{e}_{n - 1}', VRACHT_LINKS)
     rss_data, datex_d, datex_a = None, None, None
     # per minuut de lussen uitlezen (de e1-xml schrijft SUMO pas weg bij het afsluiten);
@@ -253,9 +256,12 @@ def main():
                         traci.route.add(rid, pad_voor(r, g, u))
                     vid = f'{naam[0]}{n_veh}'
                     n_veh += 1
-                    traci.vehicle.add(vid, rid, typeID=typ, depart=f'{sim_t + (j + random.random()) * 60 / max(1, len(types)):.1f}',
-                                      departLane='best', departSpeed=(v_in if typ == 'auto' or v_in == 'max' else f'{min(float(v_in), 24.5):.1f}') if g['soort'] == 'hoofd' else 'max',
-                                      arrivalPos=f'{r["eind_pos"]:.1f}' if u is None else 'max')
+                    try:
+                        traci.vehicle.add(vid, rid, typeID=typ, depart=f'{sim_t + (j + random.random()) * 60 / max(1, len(types)):.1f}',
+                                          departLane='best', departSpeed=(v_in if typ == 'auto' or v_in == 'max' else f'{min(float(v_in), 24.5):.1f}') if g['soort'] == 'hoofd' else 'max',
+                                          arrivalPos=f'{r["eind_pos"]:.1f}' if u is None else 'max')
+                    except traci.TraCIException as fout:  # bv. alle stroken voor dit type tijdelijk dicht: niet de hele run laten vallen
+                        print(f'{m:%H:%M} voertuig {vid} niet ingevoegd: {fout}', flush=True)
                 totaal += len(types)
             # spitsstrook
             s = spitsstrook[naam]

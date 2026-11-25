@@ -2,7 +2,8 @@
 
 Gebruik:  python miv_logger.py --tot 20:00 [--ids data/meetpunten_e314.csv,data/meetpunten_heverlee.csv]
 
-Standaard: de E314-corridor plus het Knooppunt Heverlee (E40 x E314, instroom richting Aarschot).
+Standaard: de E314-corridor, het Knooppunt Heverlee (E40 x E314, instroom richting Aarschot) en de E314 vóór
+Aarschot (Tielt-Winge, Bekkevoort, Halen: de ochtendfile richting Leuven begint soms al daar).
 
 Schrijft per dag data/live/miv_YYYY-MM-DD.csv met één rij per (minuut, meetpunt, klasse).
 De feed geeft enkel de laatste minuut; dit script bouwt dus zelf de historiek op.
@@ -49,7 +50,7 @@ KOLOMMEN = ["tijd", "unieke_id", "beschikbaar", "defect", "geldig", "bezetting",
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ids", default=",".join(os.path.join(HIER, "data", f) for f in
-                                              ("meetpunten_e314.csv", "meetpunten_heverlee.csv")))
+                                              ("meetpunten_e314.csv", "meetpunten_heverlee.csv", "meetpunten_noord.csv")))
     ap.add_argument("--tot", default="23:59", help="stoptijd HH:MM (lokale tijd)")
     a = ap.parse_args()
     ids = lees_ids(a.ids)
