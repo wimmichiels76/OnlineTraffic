@@ -7,7 +7,7 @@ Prototype, gestart op 24/11/2026. De vraag: kan een SUMO-model van een snelweg, 
 | Stap | Script | Resultaat |
 | --- | --- | --- |
 | 1. Meetpunten | `maak_meetpuntenlijst.py` | `data/meetpunten_e314.csv`: 188 MIV-lussen (A0020001 = richting Leuven, A0020002 = richting Aarschot, A002xxxx = takken) |
-| 2. Live data | `miv_logger.py --tot HH:MM` | `data/live/miv_YYYY-MM-DD.csv`. De feed geeft alleen de laatste minuut, dus de logger bouwt zelf de historiek op. |
+| 2. Live data | `miv_logger.py --tot HH:MM` | `data/live/miv_YYYY-MM-DD.csv`. De feed geeft alleen de laatste minuut, dus de logger bouwt zelf de historiek op. Sinds 25/11 (17:12) logt hij ook de 61 meetpunten van het Knooppunt Heverlee (E40 × E314, `data/meetpunten_heverlee.csv`, binnen 3 km). Daar moet de instroom richting Aarschot vandaan komen: de huidige instroomdoorsnede op km 86,7 staat in de avondspits zelf in de file (10-35 km/u) en telt dan de afvoer, niet de vraag. |
 | 2b. Verkeerscentrum | `vc_logger.py --tot HH:MM` | `data/live/rss_*.csv`: rijstrooksignalisatie per bord per minuut (snelheid, kruis, pijl), uit `rss-opendata.belfla.be` (geen auth). `data/live/datex_*.csv`: DATEX II v3-situaties (ongeval, file, werken, strookbeheer) binnen 400 m van een corridorlus. De geometrie staat in Lambert72; wegnamen staan niet in de feed. |
 | 3. Netwerk | `bouw_osm.py`, netconvert, `bouw_net.py` | `net/e314.net.xml`: OSM motorway + motorway_link. De spitsstrook richting Leuven is toegevoegd als strook 0, omdat OSM die niet meetelt. |
 | 4. Koppeling | `koppel_detectoren.py`, `bouw_corridor.py` | `data/corridor.json`: per richting de hoofdbaanroute, de meetdoorsneden (MIV-strook → SUMO-strook) en de op- en afritten |

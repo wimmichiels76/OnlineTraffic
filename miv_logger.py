@@ -1,6 +1,8 @@
 """Logt de MIV-minuutfeed (AWV/Verkeerscentrum) voor een set meetpunten.
 
-Gebruik:  python miv_logger.py --tot 20:00 [--ids data/meetpunten_e314.csv]
+Gebruik:  python miv_logger.py --tot 20:00 [--ids data/meetpunten_e314.csv,data/meetpunten_heverlee.csv]
+
+Standaard: de E314-corridor plus het Knooppunt Heverlee (E40 x E314, instroom richting Aarschot).
 
 Schrijft per dag data/live/miv_YYYY-MM-DD.csv met één rij per (minuut, meetpunt, klasse).
 De feed geeft enkel de laatste minuut; dit script bouwt dus zelf de historiek op.
@@ -12,9 +14,12 @@ URL = "http://miv.opendata.belfla.be/miv/verkeersdata"
 HIER = os.path.dirname(os.path.abspath(__file__))
 
 
-def lees_ids(pad):
-    with open(pad, encoding="utf-8") as f:
-        return {r["unieke_id"] for r in csv.DictReader(f)}
+def lees_ids(paden):
+    ids = set()
+    for pad in paden.split(","):
+        with open(pad, encoding="utf-8") as f:
+            ids |= {r["unieke_id"] for r in csv.DictReader(f)}
+    return ids
 
 
 def haal(ids):
@@ -43,7 +48,8 @@ KOLOMMEN = ["tijd", "unieke_id", "beschikbaar", "defect", "geldig", "bezetting",
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ids", default=os.path.join(HIER, "data", "meetpunten_e314.csv"))
+    ap.add_argument("--ids", default=",".join(os.path.join(HIER, "data", f) for f in
+                                              ("meetpunten_e314.csv", "meetpunten_heverlee.csv")))
     ap.add_argument("--tot", default="23:59", help="stoptijd HH:MM (lokale tijd)")
     a = ap.parse_args()
     ids = lees_ids(a.ids)
