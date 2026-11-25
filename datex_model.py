@@ -6,7 +6,7 @@ De vertaling naar het model is dus een AANNAME per type (EFFECT hieronder, aanpa
   Accident                          -> stilstaand voertuig op de rechterrijstrook (blokkeert die lokaal)
                                        + vmax 70 km/u binnen ±300 m (afremmen, kijkfile)
   MaintenanceWorks                  -> vmax 90 km/u over de lengte van de melding
-  RoadOrCarriagewayOrLaneManagement -> *Closure*: rechterstrook dicht; newRoadworksLayout e.a.: vmax 70 km/u
+  RoadOrCarriagewayOrLaneManagement -> vmax 70 km/u (ook laneClosures: geen strook dicht, zie SLUIT_UIT_DATEX)
   EnvironmentalObstruction          -> vmax 70 km/u
   Werfinrichting en obstakel krijgen bovendien een capaciteitsverlies: voertuigen in de zone volgen met
   tau x 1,75 (smalle stroken, meer afstand). Afgesteld op de avondspits van 24/11 (25/11/2026): 1,6 geeft een
@@ -29,6 +29,11 @@ EFFECT = {
     'RoadOrCarriagewayOrLaneManagement': dict(vmax=70, buffer=0, tau=1.75),
     'EnvironmentalObstruction': dict(vmax=70, buffer=0, tau=1.75),
 }
+# Een laneClosures-melding sluit in het model GEEN strook. Sinds 25/11/2026 publiceert de feed bij elke lopende
+# werf extra deelrecords (-M-LC1, -A-LO1, -A-LCA ...) van het type laneClosures, terwijl de rijstroken open blijven:
+# op km 4,9 richting Aarschot telde de rechterstrook die avond 996 vtg/u (53 %), en de RSS toonden geen rood kruis.
+# Strookafsluitingen komen daarom uit de RSS (rss_model) en uit ongevallen; laneClosures krijgt vmax en tau.
+SLUIT_UIT_DATEX = False
 MAX_AFSTAND = 60  # m tot de rijbaan; verder = andere weg (bv. E40, op- of afrit)
 ALERTC = {'positive': 'Aarschot', 'negative': 'Leuven'}  # E314 (A2), zie projecteer()
 
@@ -122,7 +127,8 @@ class Meldingen:
                 continue
             naam, x0, x1, _ = lig
             det = json.loads(r.details)
-            sluit = r.type == 'RoadOrCarriagewayOrLaneManagement' and 'Closure' in det.get('roadOrCarriagewayOrLaneManagementType', '')
+            sluit = (SLUIT_UIT_DATEX and r.type == 'RoadOrCarriagewayOrLaneManagement'
+                     and 'Closure' in det.get('roadOrCarriagewayOrLaneManagementType', ''))
             a, b = x0 - eff['buffer'], x1 + eff['buffer']
             for e in self.corr[naam]['route']:
                 E = self.net.getEdge(e)

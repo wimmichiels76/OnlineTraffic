@@ -65,6 +65,15 @@ Prototype, gestart op 24/11/2026. De vraag: kan een SUMO-model van een snelweg, 
   | trefkans file (vals alarm) | 99 % (19 %) | 99 % (19 %) | **99 % (19 %)** | 100 % (24 %) | 100 % (30 %) | |
 
   Het effect kantelt scherp rond 1,8. De standaard is nu 1,75. Richting Leuven: 98 % van de debieten binnen GEH 5. De replay van deze afstelling staat in `uit/replay_tau1.75_2026-11-24/`.
+- **DATEX laneClosures sluit geen strook (25/11):** sinds 25/11 publiceert de feed bij elke lopende werf extra deelrecords van het type `laneClosures`. Het model sloot daarop de rechterstrook in Herent, terwijl die open was (km 4,9: 996 vtg/u, 53 %; de RSS tonen geen kruis). De live-runs van 25/11 kwamen zo op 42-44 min reistijd tegen 14 gemeten. Strookafsluitingen komen nu enkel uit de RSS en uit ongevallen (`SLUIT_UIT_DATEX` in `datex_model.py`). Avondspits 25/11, 17:45-20:15, richting Aarschot:
+
+  | | live-run (strook dicht) | hersteld, instroom km 86,7 | hersteld, instroom Heverlee | gemeten |
+  | --- | --- | --- | --- | --- |
+  | reistijd gem/max (min) | 41,5 / 73,9 | 12,6 / 15,2 | 13,0 / 15,4 | 14,0 / 25,0 |
+  | RMSE snelheid (km/u) | 38,4 | 13,5 | 13,8 | |
+  | debiet GEH < 5 | 4 % | 24 % | 30 % | |
+
+  De file van 17:45-18:30 is in het model te kort: de run start om 17:30 leeg (de Heverlee-lussen worden pas sinds 17:12 gelogd). De Heverlee-balans sluit: na de file (19:00-20:15) 2 005 vtg/u instroom tegen 1 961 gemeten op km 86,7. Lus 1096 (afrit Bertem) telt de hele avond 0 zonder defectvlag; het effect op de balans is te verwaarlozen.
 
 ## Installatie
 
