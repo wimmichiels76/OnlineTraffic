@@ -50,15 +50,22 @@ def schrijf_additionals(corr, pad, tag, lc=''):
         f.write('</additional>\n')
 
 
-def routes_bouwen(net, corr):
-    """Per richting: lijst van ingangen en uitgangen met hun edge-pad."""
+def routes_bouwen(net, corr, instroom=False):
+    """Per richting: lijst van ingangen en uitgangen met hun edge-pad.
+
+    instroom=True: waar corridor.json een 'instroom' heeft (bouw_instroom.py, Knooppunt Heverlee), komt de vraag
+    van die ingangen vóór de file; de eerste meetdoorsnede dient dan enkel als controle."""
     R = {}
     for naam, c in corr.items():
         route = c['route']
         idx = {e: i for i, e in enumerate(route)}
         eind_pos = c['doorsneden'][-1]['pos'] + 30
-        ing = [dict(soort='hoofd', ids=list(c['doorsneden'][0]['lanes']), x=c['doorsneden'][0]['x'], pad=[], i=0,
-                    naam='begin ' + c['doorsneden'][0]['naam'])]
+        if instroom and c.get('instroom'):
+            ing = [dict(soort='hoofd' if k == 0 else 'oprit', ids=g['plus'], min=g['min'], x=-g['lengte'], pad=g['pad'],
+                        i=0, naam=g['naam']) for k, g in enumerate(c['instroom'])]
+        else:
+            ing = [dict(soort='hoofd', ids=list(c['doorsneden'][0]['lanes']), x=c['doorsneden'][0]['x'], pad=[], i=0,
+                        naam='begin ' + c['doorsneden'][0]['naam'])]
         for t in c['opritten']:
             ing.append(dict(soort='oprit', ids=t['ids'], x=t['x'], pad=t['pad'], i=idx[t['hoofd_edge']], naam=t['naam']))
         uit = [dict(soort='afrit', ids=t['ids'], x=t['x'], pad=t['pad'], i=idx[t['hoofd_edge']], naam=t['naam'])
@@ -86,6 +93,14 @@ def pad_voor(r, g, u):
     return g['pad'] + route[g['i']:eind] + (u['pad'] if u else [])
 
 
+def vraag(M, g, t, kol='q'):
+    """Som over het venster voor een ingang of uitgang; bij een balans (g['min']) plus min min, niet negatief."""
+    q, n = venster_som(M, g['ids'], t, kol)
+    if g.get('min'):
+        q = max(0.0, q - venster_som(M, g['min'], t, kol)[0])
+    return q, n
+
+
 def venster_som(M, ids, t, kol='q'):
     sel = M[(M.tijd > t - pd.Timedelta(minutes=VENSTER)) & (M.tijd <= t) & M.unieke_id.isin(ids)]
     return sel[kol].sum(), sel.tijd.nunique()
@@ -106,6 +121,8 @@ def main():
     ap.add_argument('--rss-naleving', type=float, default=1.0, help='gereden snelheid = factor x bordsnelheid')
     ap.add_argument('--lc', default='', help='extra strookwisselparameters voor auto en vracht, bv. '
                     '"lcCooperative=1 lcCooperativeSpeed=1 lcAssertive=1.5"')
+    ap.add_argument('--instroom', choices=['auto', 'heverlee', 'doorsnede'], default='auto',
+                    help='richting Aarschot: vraag vanaf het Knooppunt Heverlee (auto = als die meetpunten er zijn)')
     ap.add_argument('--werf-tau', type=float, help='tau-factor in werfzones (standaard: datex_model.EFFECT, 2.0)')
     a = ap.parse_args()
     if a.werf_tau:
@@ -118,7 +135,17 @@ def main():
 
     corr = json.load(open('data/corridor.json'))
     net = sumolib.net.readNet('net/e314.net.xml')
-    R = routes_bouwen(net, corr)
+    instroom = False
+    if a.instroom != 'doorsnede':
+        ids = {i for c in corr.values() for g in c.get('instroom', []) for i in g['plus']}
+        M0 = miv_data.lees(a.datum)
+        t_ref = min(pd.Timestamp(f'{a.datum} {a.van}') - pd.Timedelta(minutes=a.opwarm), M0.tijd.max())
+        aanwezig = set(M0[(M0.tijd >= t_ref) & (M0.tijd < t_ref + pd.Timedelta(minutes=2))].unieke_id)
+        instroom = bool(ids) and ids <= aanwezig
+        if a.instroom == 'heverlee' and not instroom:
+            raise SystemExit('geen Heverlee-meetpunten in de data op de starttijd (gelogd sinds 25/11/2026 17:12)')
+    print('instroom richting Aarschot:', 'Knooppunt Heverlee' if instroom else 'doorsnede km 86,7', flush=True)
+    R = routes_bouwen(net, corr, instroom)
     add = f'net/e314_{a.tag}.add.xml'
     lc = ' '.join(f'{k}="{v}"' for k, v in (p.split('=') for p in a.lc.split())) if a.lc else ''
     schrijf_additionals(corr, add, a.tag, lc)
@@ -185,10 +212,10 @@ def main():
         sim_t = (m - t0).total_seconds()
         for naam, r in R.items():
             # afrit-aandelen via balans
-            F, _ = venster_som(M, r['ing'][0]['ids'], m)
+            F, _ = vraag(M, r['ing'][0], m)
             p = {}
             for soort, k, obj in r['events']:
-                q, _ = venster_som(M, obj['ids'], m)
+                q, _ = vraag(M, obj, m)
                 if soort == 'op':
                     F += q
                 else:
@@ -200,6 +227,9 @@ def main():
             for g in r['ing']:
                 sel = Mm[Mm.unieke_id.isin(g['ids'])]
                 n_a, n_v = int(sel.q_auto.sum()), int(sel.q_vracht.sum())
+                if g.get('min'):  # balans: per minuut te ruisig, dus het gemiddelde over het venster, stochastisch afgerond
+                    n_a, n_v = (int(x) + (random.random() < x % 1) for x in
+                                (vraag(M, g, m, k)[0] / max(1, vraag(M, g, m, k)[1]) for k in ('q_auto', 'q_vracht')))
                 v_in = sel.v.mean() if g['soort'] == 'hoofd' else np.nan
                 v_in = 'max' if not np.isfinite(v_in) else f'{max(v_in, 10) / 3.6:.1f}'
                 types = ['auto'] * n_a + ['vracht'] * n_v

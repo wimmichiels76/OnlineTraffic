@@ -17,6 +17,8 @@ def ingangen():
     naam = {}
     for n, cc in c.items():
         naam[cc['route'][0]] = f'{n} | hoofdbaan'
+        for g in cc.get('instroom', []):
+            naam[g['pad'][0]] = f"{n} | instroom {g['naam']}"
         for o in cc['opritten']:
             naam[o['pad'][0]] = f"{n} | {o['ident'][:8]} {o['naam']}"
     return naam
