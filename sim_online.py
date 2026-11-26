@@ -184,11 +184,29 @@ def main():
     # ze rechts blijven (MIV 24/11: 94 % rijdt rechts bij 2 stroken). Spitsstrook = strook 0 (rechts).
     # Niet vóór een strookvermindering: daar loopt de rechterstrook dood en kan een afsluiting (werfzone) de enige
     # resterende weg voor vrachtwagens blokkeren (25/11, Herent: 3 -> 2 stroken met de rechterstrook dicht).
+    # Het verbod vervalt zolang een andere strook van dat wegvak dicht is (RSS-kruis, spitsstrook dicht): dan mogen
+    # vrachtwagens links, en anders hebben ze geen route (26/11: spitsstrook dicht + kruis km 81,7).
+    # Ook een afsluiting op het wegvak ervoor telt: daar kan de enige open strook net naar de linkse leiden
+    # (26/11: rechterstrook 345592226.537 dicht -> enkel nog strook 2 van 41404236 bereikbaar).
+    vracht_edges = {}  # edge -> (index meest linkse strook, vorige edge)
     for c in corr.values():
-        for e, volgende in zip(c['route'], c['route'][1:] + [None]):
+        for vorige, e, volgende in zip([None] + c['route'][:-1], c['route'], c['route'][1:] + [None]):
             n = net.getEdge(e).getLaneNumber()
             if n >= 3 and (volgende is None or net.getEdge(volgende).getLaneNumber() >= n):
-                traci.lane.setDisallowed(f'{e}_{n - 1}', VRACHT_LINKS)
+                vracht_edges[e] = (n - 1, vorige)
+
+    def vrachtregel():
+        for e, (k, vorige) in vracht_edges.items():
+            links = traci.lane.getDisallowed(f'{e}_{k}')
+            if 'passenger' in links:
+                continue  # strook zelf dicht: niet aankomen
+            andere_dicht = any('passenger' in traci.lane.getDisallowed(f'{e}_{j}') for j in range(k)) or (
+                vorige is not None and any('passenger' in traci.lane.getDisallowed(f'{vorige}_{j}')
+                                           for j in range(net.getEdge(vorige).getLaneNumber())))
+            wens = [] if andere_dicht else VRACHT_LINKS
+            if sorted(links) != sorted(wens):
+                traci.lane.setDisallowed(f'{e}_{k}', wens)
+    vrachtregel()
     rss_data, datex_d, datex_a = None, None, None
     # per minuut de lussen uitlezen (de e1-xml schrijft SUMO pas weg bij het afsluiten);
     # let op: TraCI geeft de rekenkundige gemiddelde snelheid, de e1-xml de harmonische
@@ -220,6 +238,7 @@ def main():
             w_mel, blok, mel_tekst = mel.gewenst(datex_model.actief(datex_d, datex_a, m))
             mel.blokkeer(blok)
         regelaar.pas_toe(datex_model.Regelaar.samen(w_rss, w_mel), a.rss_naleving)
+        vrachtregel()
         sim_t = (m - t0).total_seconds()
         for naam, r in R.items():
             # afrit-aandelen via balans
@@ -278,6 +297,7 @@ def main():
             vmax = 120 if not np.isfinite(v_rand) or v_rand > 90 else max(v_rand, 10)
             traci.edge.setMaxSpeed(r['route'][-1], vmax / 3.6)
             log.write(f'{m:%H:%M},{naam},{totaal},{traci.simulation.getMinExpectedNumber()},{int(is_open)},{v_rand:.0f},{rss_tekst.get(naam, '')},{' '.join(t for t in mel_tekst if '@' + naam in t)}\n')
+        vrachtregel()
         if mel is not None and mel.zone_tau:
             for k in range(1, 13):  # in stappen van 5 s, zodat voertuigen in een werfzone hun tau krijgen
                 traci.simulationStep(sim_t + 5 * k)

@@ -57,7 +57,7 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0, datum=None, cor
     map_ = os.path.join('uit', f'replay_{tag}')
     os.makedirs(map_, exist_ok=True)
     # ---- snelheden per strook -> variabele snelheidsborden
-    snel, dicht, ongeval, vracht = {}, {}, {}, set()
+    snel, dicht, ongeval, vracht = {}, {}, {}, {}
     for t, wat, i, v in opname.rij:
         if wat == 'lane.setMaxSpeed':
             snel.setdefault(i, []).append((t, v))
@@ -65,10 +65,9 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0, datum=None, cor
             for L in net.getEdge(i).getLanes():
                 snel.setdefault(L.getID(), []).append((t, v))
         elif wat == 'lane.setDisallowed':
-            if v and 'passenger' not in v:  # enkel vrachtwagens geweerd (meest linkse strook): permanent verbod
-                vracht.add(i)
-            else:
-                dicht.setdefault(i, []).append((t, bool(v)))
+            # drie toestanden: dicht (alles geweerd), vrachtverbod (enkel vrachtwagens), open
+            dicht.setdefault(i, []).append((t, 'passenger' in v))
+            vracht.setdefault(i, []).append((t, bool(v) and 'passenger' not in v))
         elif wat == 'ongeval+':
             ongeval[i] = [t, None, v]
         elif wat == 'ongeval-' and i in ongeval:
@@ -84,24 +83,25 @@ def schrijf(tag, opname, net, begin, einde, vehroutes, offset=0, datum=None, cor
                 ET.SubElement(vss, 'step', time=f'{t + offset:.0f}', speed=f'{v:.2f}')
                 vorige = v
     # ---- gesloten stroken -> rerouter met closingLaneReroute per interval
-    for k, (lid, stappen) in enumerate(sorted(dicht.items())):
-        intervallen, start = [], None
+    def intervallen(stappen):
+        uit, start = [], None
         for t, d in sorted(stappen, key=lambda s: s[0]) + [(einde, False)]:
             if d and start is None:
-                start = t
+                start = max(t, begin)
             elif not d and start is not None:
-                intervallen.append((start, t))
+                uit.append((start, t))
                 start = None
-        if not intervallen:
-            continue
-        rr = ET.SubElement(add, 'rerouter', id=f'dicht{k}', edges=lid.rsplit('_', 1)[0])
-        for b, e in intervallen:
-            iv = ET.SubElement(rr, 'interval', begin=f'{b + offset:.0f}', end=f'{e + offset:.0f}')
-            ET.SubElement(iv, 'closingLaneReroute', id=lid, disallow=DICHT)
-    for k, lid in enumerate(sorted(vracht)):
-        rr = ET.SubElement(add, 'rerouter', id=f'vracht{k}', edges=lid.rsplit('_', 1)[0])
-        iv = ET.SubElement(rr, 'interval', begin=f'{begin + offset:.0f}', end=f'{einde + offset:.0f}')
-        ET.SubElement(iv, 'closingLaneReroute', id=lid, disallow='truck trailer')
+        return [(b, e) for b, e in uit if e > b]
+
+    for soort, tabel, weer in (('dicht', dicht, DICHT), ('vracht', vracht, 'truck trailer')):
+        for k, (lid, stappen) in enumerate(sorted(tabel.items())):
+            iv_lijst = intervallen(stappen)
+            if not iv_lijst:
+                continue
+            rr = ET.SubElement(add, 'rerouter', id=f'{soort}{k}', edges=lid.rsplit('_', 1)[0])
+            for b, e in iv_lijst:
+                iv = ET.SubElement(rr, 'interval', begin=f'{b + offset:.0f}', end=f'{e + offset:.0f}')
+                ET.SubElement(iv, 'closingLaneReroute', id=lid, disallow=weer)
     ET.indent(add)
     ET.ElementTree(add).write(os.path.join(map_, 'regeling.add.xml'), encoding='utf-8', xml_declaration=True)
     # ---- voertuigen: de door SUMO weggeschreven routes, zonder ongevalsvoertuigen, + ongevallen met een stop
